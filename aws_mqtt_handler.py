@@ -53,12 +53,13 @@ def setup_mqtt():
 
     return mqtt_connection
 
-def publish_data(mqtt_connection, userId, temp):
+def publish_data(mqtt_connection, userId, temp, sessionId):
     timestamp = datetime.utcnow().isoformat() + "Z"
     payload = {
         "userId": userId,
         "temp": temp,
-        "timestamp": timestamp
+        "timestamp": timestamp,
+        "sessionId": str(sessionId)
     }
     message_json = json.dumps(payload)
     print(f"Publishing to AWS: {message_json}")

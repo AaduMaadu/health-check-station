@@ -4,9 +4,10 @@ import time
 import json
 import adafruit_dht
 import board
+import uuid
 from gpiozero import LED, Button
 from tinydb import TinyDB
-from aws_mqtt_handler import setup_mqtt, publish_data, get_response
+from aws_mqtt_handler import setup_mqtt, publish_data, get_response, on_message_received
 
 # GPIO setup
 dht_device = adafruit_dht.DHT11(board.D4)
@@ -22,6 +23,7 @@ db = TinyDB('db.json')
 # MQTT
 mqtt_connection = setup_mqtt()
 response = None
+led3.on()
 
 def getDHTData():
     try:
@@ -37,13 +39,14 @@ def getDHTData():
 while True:
     if button.is_pressed:
         print("Button pressed.")
-        led3.on()
+        led3.off()
+        sessionId = uuid.uuid4()
 
         # Stall indicator (blink)
         for _ in range(5):
             temp = getDHTData()
-            db.insert({'temp': stable_temp, 'userId': userId}) # Save to DB
-            publish_data(mqtt_connection, userId, temp) # Publish to AWS
+            db.insert({'temp': temp, 'userId': userId}) # Save to DB
+            publish_data(mqtt_connection, userId, temp, sessionId) # Publish to AWS
             led1.on()
             time.sleep(0.5)
             led1.off()
@@ -54,28 +57,24 @@ while True:
             response = get_response()
             
             if response is not None:
+                parsed = json.loads(response)
                 break
                 
             print(f"No response, attemptting again {i}")
             led2.on()
             time.sleep(0.5)
             led2.off()
-                
-        led3.off()
 
-        if response == "GOOD":
-            print("AWS response: GOOD")
+        if parsed.get("Output") == "1":
+            print(f"Check in for {userId} was SUCCESSFULL")
             led1.on()
             time.sleep(5)
             led1.off()
         else:
-            print("AWS response: BAD or timeout")
+            print(f"Check in for {userId} was FAILED due to abnormal readings")
             led2.on()
             time.sleep(5)
             led2.off()
 
+    led3.on()
     time.sleep(1)
-    
-    #stable_temp = getDHTData()
-    #db.insert({'temp': stable_temp, 'userId': userId})
-    #publish_data(mqtt_connection, userId, stable_temp)
